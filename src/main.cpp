@@ -1,135 +1,60 @@
-
-//   Diagnostic test for the displayed colour order
-//
-// Written by Bodmer 17/2/19 for the TFT_eSPI library:
-// https://github.com/Bodmer/TFT_eSPI
-
-/* 
- Different hardware manufacturers use different colour order
- configurations at the hardware level.  This may result in
- incorrect colours being displayed.
-
- Incorrectly displayed colours could also be the result of
- using the wrong display driver in the library setup file.
-
- Typically displays have a control register (MADCTL) that can
- be used to set the Red Green Blue (RGB) colour order to RGB
- or BRG so that red and blue are swapped on the display.
-
- This control register is also used to manage the display
- rotation and coordinate mirroring. The control register
- typically has 8 bits, for the ILI9341 these are:
-
- Bit Function
- 7   Mirror Y coordinate (row address order)
- 6   Mirror X coordinate (column address order)
- 5   Row/column exchange (for rotation)
- 4   Refresh direction (top to bottom or bottom to top in portrait orientation)
- 3   RGB order (swaps red and blue)
- 2   Refresh direction (top to bottom or bottom to top in landscape orientation)
- 1   Not used
- 0   Not used
-
- The control register bits can be written with this example command sequence:
- 
-    tft.writecommand(TFT_MADCTL);
-    tft.writedata(0x48);          // Bits 6 and 3 set
-    
- 0x48 is the default value for ILI9341 (0xA8 for ESP32 M5STACK)
- in rotation 0 orientation.
- 
- Another control register can be used to "invert" colours,
- this swaps black and white as well as other colours (e.g.
- green to magenta, red to cyan, blue to yellow).
- 
- To invert colours insert this line after tft.init() or tft.begin():
-
-    tft.invertDisplay( invert ); // Where invert is true or false
-
-*/
 #include <Arduino.h>
-#include <SPI.h>
+#include <TFT_eSPI.h>         // TFT 屏幕库
+#include <DHT.h>
+#include <DHT_U.h>
+#include <Adafruit_Sensor.h>
 
-#include <TFT_eSPI.h>       // Hardware-specific library
+// DHT11 配置
+#define DHTPIN 9
+#define DHTTYPE DHT11
+DHT_Unified dht(DHTPIN, DHTTYPE);
 
-TFT_eSPI tft = TFT_eSPI();  // Invoke custom library
+// TFT 配置
+TFT_eSPI tft = TFT_eSPI();  // 使用 User_Setup.h 中配置的引脚
 
-void setup(void) {
+void setup() {
+  Serial.begin(921600);
+
+  // 初始化 TFT
   tft.init();
-
+  tft.setRotation(1);  // 屏幕旋转，可根据需求调整
   tft.fillScreen(TFT_BLACK);
-  tft.drawRect(0, 0, tft.width(), tft.height(), TFT_GREEN);
 
-  // Set "cursor" at top left corner of display (0,0) and select font 4
-  tft.setCursor(0, 4, 4);
+  // 初始化 DHT11
+  dht.begin();
 
-  // Set the font colour to be white with a black background
-  tft.setTextColor(TFT_WHITE);
-
-  // We can now plot text on screen using the "print" class
-  tft.println(" Initialised default\n");
-  tft.println(" White text");
-  
-  tft.setTextColor(TFT_RED);
-  tft.println(" Red text");
-  
-  tft.setTextColor(TFT_GREEN);
-  tft.println(" Green text");
-  
-  tft.setTextColor(TFT_BLUE);
-  tft.println(" Blue text");
-
-  delay(5000);
-
+  // 清屏写标题
+  tft.setTextSize(2);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(10, 10);
+  // tft.println("ESP32 DHT11 Demo");
 }
 
 void loop() {
+  sensors_event_t event;
 
-  tft.invertDisplay( false ); // Where i is true or false
- 
-  tft.fillScreen(TFT_BLACK);
-  tft.drawRect(0, 0, tft.width(), tft.height(), TFT_GREEN);
+  // 读取温度
+  dht.temperature().getEvent(&event);
+  float temperature = isnan(event.temperature) ? 0 : event.temperature;
 
-  tft.setCursor(0, 4, 4);
+  // 读取湿度
+  dht.humidity().getEvent(&event);
+  float humidity = isnan(event.relative_humidity) ? 0 : event.relative_humidity;
 
-  tft.setTextColor(TFT_WHITE);
-  tft.println(" Invert OFF\n");
+  // 打印到串口
+  Serial.print("温度: "); Serial.print(temperature); Serial.print(" C, ");
+  Serial.print("湿度: "); Serial.print(humidity); Serial.println(" %");
 
-  tft.println(" White text");
-  
-  tft.setTextColor(TFT_RED);
-  tft.println(" Red text");
-  
-  tft.setTextColor(TFT_GREEN);
-  tft.println(" Green text");
-  
-  tft.setTextColor(TFT_BLUE);
-  tft.println(" Blue text");
+  // 在屏幕显示
+  tft.fillRect(0, 50, 240, 100, TFT_BLACK); // 清除上一条数据
+  tft.setCursor(10, 60);
+  tft.setTextSize(3);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.print("temp: "); tft.print(temperature); tft.println("C");
 
-  delay(5000);
+  tft.setCursor(10, 110);
+  tft.setTextColor(TFT_BLUE, TFT_BLACK);
+  tft.print("wet: "); tft.print(humidity); tft.println("%");
 
-
-  // Binary inversion of colours
-  tft.invertDisplay( true ); // Where i is true or false
- 
-  tft.fillScreen(TFT_BLACK);
-  tft.drawRect(0, 0, tft.width(), tft.height(), TFT_GREEN);
-
-  tft.setCursor(0, 4, 4);
-
-  tft.setTextColor(TFT_WHITE);
-  tft.println(" Invert ON\n");
-
-  tft.println(" White text");
-  
-  tft.setTextColor(TFT_RED);
-  tft.println(" Red text");
-  
-  tft.setTextColor(TFT_GREEN);
-  tft.println(" Green text");
-  
-  tft.setTextColor(TFT_BLUE);
-  tft.println(" Blue text");
-
-  delay(5000);
+  delay(2000); // DHT11 采样间隔 2 秒
 }
